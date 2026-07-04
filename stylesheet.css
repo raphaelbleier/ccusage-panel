@@ -1,0 +1,125 @@
+.ccusage-panel-button {
+  -natural-hpadding: 4px;
+  -minimum-hpadding: 4px;
+}
+
+.ccusage-panel-pill {
+  spacing: 6px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background-color: rgba(51, 116, 255, 0.24);
+  border: 1px solid rgba(145, 188, 255, 0.32);
+}
+
+.ccusage-panel-icon {
+  color: #9cc7ff;
+}
+
+.ccusage-panel-title {
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.ccusage-panel-amount {
+  color: #b7f7cd;
+  font-weight: 700;
+}
+
+.ccusage-menu {
+  min-width: 360px;
+}
+
+.ccusage-menu-header {
+  spacing: 10px;
+  padding: 12px 16px 8px;
+}
+
+.ccusage-header-icon {
+  color: #8fbfff;
+}
+
+.ccusage-header-title {
+  font-size: 1.08em;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.ccusage-header-subtitle,
+.ccusage-card-detail,
+.ccusage-message-label {
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.ccusage-section-title {
+  padding: 4px 16px 2px;
+}
+
+.ccusage-section-label {
+  color: rgba(255, 255, 255, 0.54);
+  font-size: 0.82em;
+  font-weight: 700;
+}
+
+.ccusage-stats-card {
+  margin: 4px 10px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  spacing: 10px;
+  background-color: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.ccusage-accent-claude {
+  border-left: 3px solid #ffb26b;
+}
+
+.ccusage-accent-codex {
+  border-left: 3px solid #72d4ff;
+}
+
+.ccusage-card-icon,
+.ccusage-row-icon {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.ccusage-card-title,
+.ccusage-total-label,
+.ccusage-refresh-label {
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.ccusage-card-money,
+.ccusage-total-money {
+  color: #b7f7cd;
+  font-weight: 800;
+}
+
+.ccusage-total-row,
+.ccusage-message-row,
+.ccusage-refresh-row {
+  spacing: 10px;
+  padding: 7px 16px;
+}
+
+.ccusage-reset-row .ccusage-row-icon,
+.ccusage-reset-row .ccusage-message-label {
+  color: #ffd27a;
+}
+
+.ccusage-muted-row .ccusage-message-label {
+  color: rgba(255, 255, 255, 0.48);
+}
+
+.ccusage-error-row .ccusage-row-icon,
+.ccusage-error-row .ccusage-message-label {
+  color: #ff8f8f;
+}
+
+.ccusage-refresh-row:hover {
+  background-color: rgba(145, 188, 255, 0.16);
+}
+
+.ccusage-refresh-icon {
+  color: #8fbfff;
+}

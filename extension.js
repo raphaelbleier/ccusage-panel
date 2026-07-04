@@ -137,13 +137,12 @@ function formatTokens(value) {
     return Math.round(value).toLocaleString();
 }
 
-function formatStatsLine(name, stats) {
+function formatStatsDetail(stats) {
     if (!stats.hasData)
-        return `${name}: --`;
+        return 'No data yet';
 
     const cacheTotal = stats.cacheCreationTokens + stats.cacheReadTokens;
     const parts = [
-        `${name}: ${formatMoney(stats)}`,
         `In ${formatTokens(stats.inputTokens)}`,
         `Out ${formatTokens(stats.outputTokens)}`,
     ];
@@ -154,9 +153,46 @@ function formatStatsLine(name, stats) {
     return parts.join(' | ');
 }
 
+function formatDuration(minutes) {
+    if (!Number.isFinite(minutes) || minutes < 0)
+        return '--';
+
+    const rounded = Math.round(minutes);
+    const hours = Math.floor(rounded / 60);
+    const remainingMinutes = rounded % 60;
+
+    if (hours <= 0)
+        return `${remainingMinutes}m`;
+
+    return `${hours}h ${remainingMinutes}m`;
+}
+
 function nowTime() {
     const date = new Date();
     return date.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+}
+
+function parseClaudeReset(json) {
+    const blocks = Array.isArray(json?.blocks) ? json.blocks : [];
+    const activeBlock = blocks.find(block => block?.isActive && block?.endTime);
+
+    if (!activeBlock)
+        return {hasData: false, label: 'Claude reset: no active block'};
+
+    const endDate = new Date(activeBlock.endTime);
+    if (Number.isNaN(endDate.getTime()))
+        return {hasData: false, label: 'Claude reset: unknown'};
+
+    const computedMinutes = (endDate.getTime() - Date.now()) / 60000;
+    const remainingMinutes = typeof activeBlock.projection?.remainingMinutes === 'number'
+        ? activeBlock.projection.remainingMinutes
+        : computedMinutes;
+    const resetTime = endDate.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+
+    return {
+        hasData: true,
+        label: `Claude reset: ${resetTime} (in ${formatDuration(remainingMinutes)})`,
+    };
 }
 
 const CcusagePanelButton = GObject.registerClass(class CcusagePanelButton extends PanelMenu.Button {
@@ -176,12 +212,39 @@ const CcusagePanelButton = GObject.registerClass(class CcusagePanelButton extend
             weekly: emptyStats(),
             monthly: emptyStats(),
         };
+        this._reset = {
+            claude: {hasData: false, label: 'Claude reset: --'},
+            codex: {hasData: false, label: 'Codex reset: not exposed by ccusage'},
+        };
 
-        this._label = new St.Label({
-            text: 'AI --',
+        this.add_style_class_name('ccusage-panel-button');
+        this.menu.box.add_style_class_name('ccusage-menu');
+
+        this._panelBox = new St.BoxLayout({
+            style_class: 'ccusage-panel-pill',
             y_align: Clutter.ActorAlign.CENTER,
         });
-        this.add_child(this._label);
+        this._panelIcon = new St.Icon({
+            icon_name: 'applications-science-symbolic',
+            icon_size: 15,
+            style_class: 'ccusage-panel-icon',
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+        this._titleLabel = new St.Label({
+            text: 'AI',
+            style_class: 'ccusage-panel-title',
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+        this._amountLabel = new St.Label({
+            text: '--',
+            style_class: 'ccusage-panel-amount',
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+
+        this._panelBox.add_child(this._panelIcon);
+        this._panelBox.add_child(this._titleLabel);
+        this._panelBox.add_child(this._amountLabel);
+        this.add_child(this._panelBox);
 
         this._rebuildMenu();
         this.refresh();
@@ -219,6 +282,7 @@ const CcusagePanelButton = GObject.registerClass(class CcusagePanelButton extend
                     return;
 
                 this._stats = result.stats;
+                this._reset = result.reset;
                 this._error = result.error;
                 this._lastUpdate = nowTime();
                 this._updateLabel();
@@ -248,6 +312,7 @@ const CcusagePanelButton = GObject.registerClass(class CcusagePanelButton extend
             codex: ['codex', 'daily', '--json'],
             weekly: ['weekly', '--json'],
             monthly: ['monthly', '--json'],
+            claudeBlocks: ['claude', 'blocks', '--json'],
         };
 
         const names = Object.keys(commands);
@@ -270,6 +335,10 @@ const CcusagePanelButton = GObject.registerClass(class CcusagePanelButton extend
         };
         const errors = [];
         const raw = {};
+        const reset = {
+            claude: {hasData: false, label: 'Claude reset: --'},
+            codex: {hasData: false, label: 'Codex reset: not exposed by ccusage'},
+        };
 
         for (const result of results) {
             if (result.error) {
@@ -278,6 +347,12 @@ const CcusagePanelButton = GObject.registerClass(class CcusagePanelButton extend
             }
 
             raw[result.name] = result.json;
+
+            if (result.name === 'claudeBlocks') {
+                reset.claude = parseClaudeReset(result.json);
+                continue;
+            }
+
             stats[result.name] = result.stats;
 
             if (!result.stats.hasData)
@@ -289,6 +364,7 @@ const CcusagePanelButton = GObject.registerClass(class CcusagePanelButton extend
 
         return {
             stats,
+            reset,
             error: errors.length > 0 ? errors.join('\n') : null,
         };
     }
@@ -374,16 +450,113 @@ const CcusagePanelButton = GObject.registerClass(class CcusagePanelButton extend
         const total = mergeStats([claude, codex]);
 
         if (!claude.hasData && !codex.hasData) {
-            this._label.text = 'AI --';
+            this._amountLabel.text = '--';
             return;
         }
 
-        this._label.text = total.hasCost ? `AI ${formatMoney(total)}` : 'AI --';
+        this._amountLabel.text = total.hasCost ? formatMoney(total) : '--';
     }
 
-    _addDisabledItem(text) {
-        const item = new PopupMenu.PopupMenuItem(text);
-        item.setSensitive(false);
+    _icon(iconName, styleClass = 'ccusage-row-icon') {
+        return new St.Icon({
+            icon_name: iconName,
+            icon_size: 16,
+            style_class: styleClass,
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+    }
+
+    _addHeader() {
+        const item = new PopupMenu.PopupBaseMenuItem({reactive: false, can_focus: false});
+        item.add_style_class_name('ccusage-menu-header');
+
+        const textBox = new St.BoxLayout({vertical: true, x_expand: true});
+        textBox.add_child(new St.Label({
+            text: 'ccusage',
+            style_class: 'ccusage-header-title',
+        }));
+        textBox.add_child(new St.Label({
+            text: 'Claude Code and Codex usage',
+            style_class: 'ccusage-header-subtitle',
+        }));
+
+        item.add_child(this._icon('applications-science-symbolic', 'ccusage-header-icon'));
+        item.add_child(textBox);
+        this.menu.addMenuItem(item);
+        return item;
+    }
+
+    _addSectionTitle(text) {
+        const item = new PopupMenu.PopupBaseMenuItem({reactive: false, can_focus: false});
+        item.add_style_class_name('ccusage-section-title');
+        item.add_child(new St.Label({text, style_class: 'ccusage-section-label'}));
+        this.menu.addMenuItem(item);
+        return item;
+    }
+
+    _addMessage(text, iconName = 'dialog-information-symbolic', styleClass = '') {
+        const item = new PopupMenu.PopupBaseMenuItem({reactive: false, can_focus: false});
+        item.add_style_class_name('ccusage-message-row');
+        if (styleClass)
+            item.add_style_class_name(styleClass);
+
+        item.add_child(this._icon(iconName));
+        item.add_child(new St.Label({
+            text,
+            style_class: 'ccusage-message-label',
+            x_expand: true,
+        }));
+        this.menu.addMenuItem(item);
+        return item;
+    }
+
+    _addStatsCard(name, stats, iconName, accentClass) {
+        const item = new PopupMenu.PopupBaseMenuItem({reactive: false, can_focus: false});
+        item.add_style_class_name('ccusage-stats-card');
+        item.add_style_class_name(accentClass);
+
+        item.add_child(this._icon(iconName, 'ccusage-card-icon'));
+
+        const content = new St.BoxLayout({vertical: true, x_expand: true});
+        const titleRow = new St.BoxLayout({x_expand: true});
+        titleRow.add_child(new St.Label({
+            text: name,
+            style_class: 'ccusage-card-title',
+            x_expand: true,
+        }));
+        titleRow.add_child(new St.Label({
+            text: formatMoney(stats),
+            style_class: 'ccusage-card-money',
+            x_align: Clutter.ActorAlign.END,
+        }));
+
+        content.add_child(titleRow);
+        content.add_child(new St.Label({
+            text: formatStatsDetail(stats),
+            style_class: 'ccusage-card-detail',
+        }));
+
+        item.add_child(content);
+        this.menu.addMenuItem(item);
+        return item;
+    }
+
+    _addTotalRow(name, stats, iconName) {
+        const item = new PopupMenu.PopupBaseMenuItem({reactive: false, can_focus: false});
+        item.add_style_class_name('ccusage-total-row');
+
+        item.add_child(this._icon(iconName));
+        item.add_child(new St.Label({
+            text: name,
+            style_class: 'ccusage-total-label',
+            x_expand: true,
+        }));
+        item.add_child(new St.Label({
+            text: formatMoney(stats),
+            style_class: 'ccusage-total-money',
+            x_align: Clutter.ActorAlign.END,
+        }));
+
         this.menu.addMenuItem(item);
         return item;
     }
@@ -391,39 +564,49 @@ const CcusagePanelButton = GObject.registerClass(class CcusagePanelButton extend
     _rebuildMenu(statusText = null) {
         this.menu.removeAll();
 
-        this._addDisabledItem('ccusage');
+        this._addHeader();
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
         if (statusText) {
-            this._addDisabledItem(statusText);
+            this._addMessage(statusText, 'view-refresh-symbolic');
         } else if (!this._stats.claude.hasData && !this._stats.codex.hasData) {
-            this._addDisabledItem('Keine ccusage-Daten gefunden.');
-            this._addDisabledItem('Starte zuerst Claude Code oder Codex und nutze sie einmal.');
+            this._addMessage('Keine ccusage-Daten gefunden.', 'dialog-information-symbolic');
+            this._addMessage('Starte zuerst Claude Code oder Codex und nutze sie einmal.', 'utilities-terminal-symbolic');
         } else {
-            this._addDisabledItem('Heute');
-            this._addDisabledItem(formatStatsLine('Claude', this._stats.claude));
-            this._addDisabledItem(formatStatsLine('Codex', this._stats.codex));
+            this._addSectionTitle('Heute');
+            this._addStatsCard('Claude', this._stats.claude, 'applications-science-symbolic', 'ccusage-accent-claude');
+            this._addStatsCard('Codex', this._stats.codex, 'utilities-terminal-symbolic', 'ccusage-accent-codex');
             this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
-            this._addDisabledItem(`Woche: ${formatMoney(this._stats.weekly)}`);
-            this._addDisabledItem(`Monat: ${formatMoney(this._stats.monthly)}`);
+            this._addSectionTitle('Limits');
+            this._addMessage(this._reset.claude.label, 'alarm-symbolic', this._reset.claude.hasData ? 'ccusage-reset-row' : 'ccusage-muted-row');
+            this._addMessage(this._reset.codex.label, 'dialog-information-symbolic', 'ccusage-muted-row');
+            this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+            this._addTotalRow('Woche gesamt', this._stats.weekly, 'calendar-week-symbolic');
+            this._addTotalRow('Monat gesamt', this._stats.monthly, 'calendar-month-symbolic');
         }
 
         if (this._lastUpdate)
-            this._addDisabledItem(`Letztes Update: ${this._lastUpdate}`);
+            this._addMessage(`Letztes Update: ${this._lastUpdate}`, 'document-open-recent-symbolic', 'ccusage-muted-row');
 
         if (this._error) {
             this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
             for (const line of this._error.split('\n'))
-                this._addDisabledItem(`Fehler: ${line}`);
+                this._addMessage(line, 'dialog-error-symbolic', 'ccusage-error-row');
         }
 
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
-        const refreshItem = new PopupMenu.PopupMenuItem('Refresh now');
+        const refreshItem = new PopupMenu.PopupBaseMenuItem();
+        refreshItem.add_style_class_name('ccusage-refresh-row');
+        refreshItem.add_child(this._icon('view-refresh-symbolic', 'ccusage-refresh-icon'));
+        refreshItem.add_child(new St.Label({
+            text: 'Refresh now',
+            style_class: 'ccusage-refresh-label',
+        }));
         refreshItem.connect('activate', () => this.refresh());
         this.menu.addMenuItem(refreshItem);
 
-        this._addDisabledItem('Debug: journalctl /usr/bin/gnome-shell -f');
+        this._addMessage('Debug: journalctl /usr/bin/gnome-shell -f', 'utilities-terminal-symbolic', 'ccusage-muted-row');
     }
 });
 

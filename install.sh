@@ -18,6 +18,7 @@ fi
 mkdir -p "$TARGET_DIR"
 cp "$SOURCE_DIR/metadata.json" \
    "$SOURCE_DIR/extension.js" \
+   "$SOURCE_DIR/stylesheet.css" \
    "$SOURCE_DIR/ccusage-panel-helper.sh" \
    "$SOURCE_DIR/README.md" \
    "$TARGET_DIR/"

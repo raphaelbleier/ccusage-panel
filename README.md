@@ -2,7 +2,7 @@
 
 GNOME Shell top bar indicator for Claude Code and Codex usage, powered by [`ccusage`](https://www.npmjs.com/package/ccusage).
 
-It shows a compact top bar label such as `AI $12.34` and a dropdown with today's Claude/Codex usage, weekly total, monthly total, last refresh time, a manual refresh action, and error details when `ccusage` cannot return usable data.
+It shows a compact top bar label such as `AI $12.34` and a dropdown with today's Claude/Codex usage, Claude billing-block reset time when `ccusage` exposes it, weekly total, monthly total, last refresh time, a manual refresh action, and error details when `ccusage` cannot return usable data.
 
 ## Requirements
 
@@ -18,6 +18,7 @@ npx -y ccusage@latest claude daily --json
 npx -y ccusage@latest codex daily --json
 npx -y ccusage@latest weekly --json
 npx -y ccusage@latest monthly --json
+npx -y ccusage@latest claude blocks --json
 ```
 
 Each command is run asynchronously through `Gio.Subprocess` with a 15 second timeout, so GNOME Shell should not freeze.
@@ -47,6 +48,7 @@ If GNOME does not see it immediately:
 EXT_DIR="$HOME/.local/share/gnome-shell/extensions/ccusage-panel@raphael.local"
 mkdir -p "$EXT_DIR"
 cp metadata.json extension.js ccusage-panel-helper.sh README.md "$EXT_DIR/"
+cp stylesheet.css "$EXT_DIR/"
 chmod +x "$EXT_DIR/ccusage-panel-helper.sh"
 gnome-extensions enable ccusage-panel@raphael.local
 ```
