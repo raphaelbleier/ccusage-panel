@@ -1,0 +1,14 @@
+{
+  "uuid": "ccusage-panel@raphael.local",
+  "name": "ccusage Panel",
+  "description": "Shows Claude Code and Codex usage from ccusage in the GNOME top bar.",
+  "version": 1,
+  "shell-version": [
+    "45",
+    "46",
+    "47",
+    "48",
+    "49",
+    "50"
+  ]
+}
