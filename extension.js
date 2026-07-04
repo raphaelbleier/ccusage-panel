@@ -1,5 +1,6 @@
 import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
+import GObject from 'gi://GObject';
 import GLib from 'gi://GLib';
 import St from 'gi://St';
 
@@ -158,9 +159,9 @@ function nowTime() {
     return date.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
 }
 
-class CcusagePanelButton extends PanelMenu.Button {
-    constructor(extension) {
-        super(0.0, 'ccusage Panel');
+const CcusagePanelButton = GObject.registerClass(class CcusagePanelButton extends PanelMenu.Button {
+    _init(extension) {
+        super._init(0.0, 'ccusage Panel');
 
         this._extension = extension;
         this._timeoutId = 0;
@@ -424,7 +425,7 @@ class CcusagePanelButton extends PanelMenu.Button {
 
         this._addDisabledItem('Debug: journalctl /usr/bin/gnome-shell -f');
     }
-}
+});
 
 export default class CcusagePanelExtension extends Extension {
     enable() {
